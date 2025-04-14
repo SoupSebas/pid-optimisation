@@ -99,6 +99,34 @@ classdef PIDNotchController < handle
 
                     % Final controller is the product:
                     obj.C = pid_t * notch_filter;
+                case 'pidt lpf notch'
+                    % Expect: P, I, D, D_tamed, w_notch, Q1, Q2
+                    if numel(varargin) ~= 8
+                        error('Flag "pidt lpf notch" requires inputs: P, I, D, D_tamed, w_notch, Q1, Q2 LPF');
+                    end
+                    P        = varargin{1};
+                    I        = varargin{2};
+                    D        = varargin{3};
+                    D_tamed  = varargin{4};
+                    w_notch  = varargin{5};
+                    Q1       = varargin{6};
+                    Q2       = varargin{7};
+                    LPF      = varargin{8};
+
+                    % You can set your own default or large LPF corner if needed:
+                    
+                    % Create the tamed PID:
+                    pid_t = definePID(P, I, D, D_tamed);
+
+                    % Make the notch filter:
+                    % Frequencies for the notch are the same w_notch
+                    notch_filter = defineNotch(w_notch, w_notch, Q1, Q2);
+                    
+                    % create lowpassfilter
+                    lpf = defineLPF(LPF);
+
+                    % Final controller is the product:
+                    obj.C = pid_t * notch_filter * lpf;
 
                 otherwise
                     error('Unknown flag ''%s''.', flag);
