@@ -70,7 +70,7 @@ classdef PIDNotchController < handle
                     LPF      = varargin{5};
 
                     % Make the tamed PID
-                    pid_t = definePID(P, I, D, D_tamed, LPF);
+                    pid_t = definePID(P, I, D, D_tamed);
                     lpf = defineLPF(LPF);
                     obj.C = pid_t * lpf;  % The "product" is just the tamed PID + built-in LPF
 
