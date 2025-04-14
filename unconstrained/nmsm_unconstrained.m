@@ -59,7 +59,13 @@ end
 
 %% Script logic for optimiser
 
-controller_flag = 'pidt';
+%   Usage examples:
+%   1) pid
+%   2) pidt
+%   3) pidt lpf
+%   4) pidt notch
+%
+controller_flag = 'pidt lpf';
 
 fprintf('Loading plant... \n')
 load("PlantTF_hard.mat");
