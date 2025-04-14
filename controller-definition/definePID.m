@@ -1,0 +1,6 @@
+function C = definePID(P, I, D, D_tamed)
+    s = tf('s');
+    C = P * ...
+        (1 + I/s) *...
+        (((s/D) + 1) / ((s/(D_tamed)) + 1));
+end
