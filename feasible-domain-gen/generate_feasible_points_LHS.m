@@ -1,4 +1,4 @@
-function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nSelect, P)
+function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_flag, nPool, nSelect, P)
 % GENERATE_FEASIBLE_POINTS_LHS
 %   Generates a pool of feasible design vectors (1x9, positive)
 %   using Latin Hypercube Sampling (LHS).
@@ -99,7 +99,7 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
         Xout = feasiblePoints;
         Xinfo = [feasible_fBW, feasible_stability, feasible_margins];
         return;
-    else
+    elseif criteria_flag == 1
         % Sort feasible candidates by f_BW in descending order so higher bandwidth comes first
         [~, idxSort] = sort(feasible_fBW, 'descend');
         selectedIdx = idxSort(1:nSelect);
@@ -108,4 +108,29 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
         Xout = feasiblePoints(selectedIdx, :);
         % Xinfo contains corresponding [f_BW, stability, margins]
         Xinfo = [feasible_fBW(selectedIdx), feasible_stability(selectedIdx), feasible_margins(selectedIdx, :)];
+    elseif criteria_flag == 2
+        % Otherwise pick nSelect by a simple greedy distance method
+        Xout = zeros(nSelect, N);
+        poolCopy = feasiblePoints;
+    
+        % 1) pick the first point arbitrarily (e.g., first row)
+        Xout(1,:) = poolCopy(1, :);
+        poolCopy(1, :) = [];
+    
+        for k = 2:nSelect
+            distToChosen = zeros(size(poolCopy,1),1);
+    
+            % For each candidate in poolCopy, find distance to already chosen points
+            for i = 1:size(poolCopy,1)
+                diffs = Xout(1:k-1,:) - poolCopy(i,:);
+                dists = sqrt(sum(diffs.^2, 2)); 
+                distToChosen(i) = min(dists);
+            end
+    
+            % Pick the candidate with the maximum minimum-distance
+            [~, idxMax] = max(distToChosen);
+            Xout(k,:) = poolCopy(idxMax, :);
+            poolCopy(idxMax, :) = [];
+        end
     end
+end
