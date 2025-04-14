@@ -1,7 +1,8 @@
 %% Termination control
 
 
-function stop = terminality_criteria_eval(x, optimValues, state, P, controller_flag)
+function stop = terminality_criteria_eval(z, optimValues, state, P, controller_flag)
+    x = exp(z);
     persistent fvals feas_flags
     threshold = 1;
     N = 20;
@@ -46,7 +47,8 @@ end
 %% Objective function
 
 
-function cost = obj_fun(x, P, controller_flag)
+function cost = obj_fun(z, P, controller_flag)
+    x = exp(z);
     C_inputs = num2cell(x);
     C_obj = PIDNotchController(controller_flag, C_inputs{:});
     C = C_obj.C;
@@ -68,16 +70,18 @@ fprintf('Plant loaded \n');
 %    (1)  (2)  (3)  (4)     (5)      (6)  (7)      (8)   (9)
 
 fprintf('Creating feasible starting points... \n');
-x0 = generate_feasible_points_LHS(controller_flag, 10,1, P);
+x0 = generate_feasible_points_LHS(controller_flag, 100,1, P);
+z0 = log(x0);
 fprintf('Feasible points created \n \n');
 
 
 fprintf('P: %2f I: %2f D: %2f T: %2f LPF: %2f w1: %2f w2: %2f Q1: %2f Q2: %2f', x0);
 
 options = optimset('OutputFcn', @(x, optimValues, state)terminality_criteria_eval(x, optimValues, state, P, controller_flag));
-[x_opt,fval,exitflag,output] = fminsearch(@(x) obj_fun(x, P, controller_flag), x0, options);
+[z_opt,fval,exitflag,output] = fminsearch(@(z) obj_fun(z, P, controller_flag), z0, options);
 
 %% Display Results
+x_opt = exp(z_opt);  % if x is the same length as z
 
 
 x_opt_cell = num2cell(x_opt);
