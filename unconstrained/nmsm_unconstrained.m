@@ -65,7 +65,8 @@ end
 %   3) pidt lpf
 %   4) pidt notch
 %
-controller_flag = 'pidt lpf';
+controller_flag = 'pidt notch';
+criteria_flag = 1; % 1: Bandwidth sorted 2: Distance maximized w.r.t. each other
 
 fprintf('Loading plant... \n')
 load("PlantTF_hard.mat");
@@ -76,7 +77,7 @@ fprintf('Plant loaded \n');
 %    (1)  (2)  (3)  (4)     (5)      (6)  (7)      (8)   (9)
 
 fprintf('Creating feasible starting points... \n');
-x0 = generate_feasible_points_LHS(controller_flag, 100,1, P);
+x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, 100,1, P);
 z0 = log(x0);
 fprintf('Feasible points created \n \n');
 
