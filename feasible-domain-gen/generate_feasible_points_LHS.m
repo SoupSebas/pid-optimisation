@@ -69,10 +69,10 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
         C_obj = PIDNotchController(controller_flag, xCell{:});
 
         % Evaluate the cost function
-        [f_BW, validity_flag, stability, margins] = cost_fun_basic(P, C_obj.C);
+        [f_BW, stability_flag, stability, margins] = cost_fun_basic(P, C_obj.C);
 
         % If feasible, store it
-        if validity_flag == 1
+        if stability_flag == 1
             feasiblePoints = [feasiblePoints; xCandidate];
             feasible_fBW = [feasible_fBW; f_BW];
             feasible_stability = [feasible_stability; stability];
