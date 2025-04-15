@@ -14,5 +14,7 @@ function [f_BW, f_weighted, GM, PM, MM] = cost_fun_unconstrained(P,C)
     f_BW = margins.DMFrequency(1,1);
     penalty = barrier_function(GM,PM,MM,100);
     f_weighted = f_BW - penalty;
-    %fprintf('\n Bandwidth = %.0f \n Penalty = %.0f', [f_weighted, penalty]);
+    fprintf(['Bandwidth: %.0f | Penalty: %.0f | ' ...
+             'Margins [GM PM MM]:  %.0f %.0f %.0f \n '], ...
+             [f_weighted, penalty, GM, PM , MM]);
 end
