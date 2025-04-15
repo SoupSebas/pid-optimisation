@@ -30,7 +30,7 @@ classdef PIDNotchController < handle
 
             switch lower(flag)
                 
-                case 'pid'
+                case {'pid', 'pid simplified'} 
                     % Expect: P, I, D
                     if numel(varargin) ~= 3
                         error('Flag "pid" requires inputs: P, I, D');

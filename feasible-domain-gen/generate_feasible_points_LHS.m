@@ -1,4 +1,4 @@
-function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_flag, nPool, nSelect, P)
+function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_flag, nPool, nSelect, P, P_term)
 % GENERATE_FEASIBLE_POINTS_LHS
 %   Generates a pool of feasible design vectors (1x9, positive)
 %   using Latin Hypercube Sampling (LHS).
@@ -23,10 +23,12 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
     %    (1)  (2)  (3)  (4)     (5)      (6)  (7)      (8)   (9)
     %lowerB = [1, 1, 1 ,1 ,1 , 1 ,1 ,1e-3 ,1e-3];
     %upperB = [1e7, 1e4, 1e4, 1e4, 1e4, 2e3, 2e3, 5e1, 5e1];
-    lowerB = 1;
+    lowerB = 1e-2;
     upperB = 1e5;
 
     switch lower(controller_flag)
+        case 'pid simplified'
+            N = 2;
         case 'pid'
             N = 3;
         case 'pidt'
@@ -35,6 +37,8 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
             N = 5;
         case 'pidt notch'
             N = 7;
+        case 'pidt lpf notch'
+            N = 8;
         otherwise
             error('Unknown flag ''%s''.', controller_flag);
     end
@@ -46,7 +50,7 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
     % enough feasible points. For example, sample 2*nPool total:
     nCandidates = 10 * nPool;
 
-    % LHS returns an nCandidates x 9 matrix with values in (0, 1)
+    % LHS returns an nCandidates x N matrix with values in (0, 1)
     lhsMatrix = lhsdesign(nCandidates, N);
 
     % Scale each column to [lowerB, upperB]
@@ -60,6 +64,11 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
     feasible_fBW = [];       % To record the bandwidth (f_BW)
     feasible_stability = []; % To record the stability flag
     feasible_margins = [];
+
+    if contains(controller_flag , 'pid simplified')
+        P_col = P_term.* ones(nCandidates,1);
+        Xcand = [P_col Xcand];
+    end
 
     for i = 1:nCandidates
         xCandidate = Xcand(i, :);
@@ -91,6 +100,11 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
         warning('Only found %d feasible points (need %d). Returning all feasible.', ...
             size(feasiblePoints,1), nPool);
     end
+
+    if contains(controller_flag, 'pid simplified')
+        feasiblePoints = feasiblePoints(:,2:end);
+    end
+
 
     % --------------------------------------------------------------------
     % 3) Select nSelect points with the highest recorded bandwidth (f_BW)
