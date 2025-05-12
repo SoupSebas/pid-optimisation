@@ -26,6 +26,9 @@ function stop = terminality_criteria_eval(z, optimValues, state, P, controller_f
                 % Terminate if both conditions met
                 if avg_improvement < threshold && all_feasible
                     stop = true;
+                elseif fvals(end) < -1e15
+                    warning('Optimiser optimiser went bananas. This run is cooked, stopping now...')
+                    stop = true;
                 end
             end
             % Store function value
@@ -80,9 +83,9 @@ end
 %   5) pidt lpf notch
 
 
-controller_flag = 'pidt notch';
+controller_flag = 'pidt';
 P_term = 20; % For pid 'simplified' only
-criteria_flag = 1; % 1: Bandwidth sorted 2: Distance maximized w.r.t. each other
+criteria_flag = 2; % 1: Bandwidth sorted 2: Hyperdistance maximized w.r.t. each other
 plant = 'mass spring damper';
 
 % =======================
@@ -112,21 +115,50 @@ end
 
 fprintf('Creating feasible starting points...');
 x0 = [];
-while isempty(x0)
-    fprintf('...');
-    x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, 100,1, P, 20);
-end
-
-fprintf('\n');
-z0 = log(x0);
-fprintf('Feasible points created \n \n');
-
-fprintf('Parameters for initial point x0:')
-fprintf('P: %2f I: %2f D: %2f T: %2f LPF: %2f w1: %2f w2: %2f Q1: %2f Q2: %2f \n \n', x0);
-
 options = optimset('OutputFcn', @(x, optimValues, state)terminality_criteria_eval(x, optimValues, state, P, controller_flag));
-[z_opt,fval,exitflag,output] = fminsearch(@(z) obj_fun(z, P, controller_flag), z0, options);
-
+if criteria_flag == 1
+    while isempty(x0)
+        fprintf('...');
+        x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, 100,1, P, 20);
+    end
+    
+    fprintf('\n');
+    z0 = log(x0);
+    fprintf('Feasible points created \n \n');   
+    fprintf('Parameters for initial point x0:')
+    fprintf('P: %2f I: %2f D: %2f T: %2f LPF: %2f w1: %2f w2: %2f Q1: %2f Q2: %2f \n \n', x0);
+    
+    [z_opt,fval,exitflag,output] = fminsearch(@(z) obj_fun(z, P, controller_flag), z0, options);
+elseif criteria_flag == 2
+    swarm = 100;
+    x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, 100,swarm, P, 20);
+    fprintf('\n');
+    z0 = log(x0);
+    fprintf('Feasible points vector created \n');
+    fprintf('Dimensions: %.1f x %.1f \n \n', [size(x0,1) size(x0,2)]);
+    
+    z_opt_full = zeros(swarm, size(x0,2));
+    fval_full = zeros(swarm, 1);
+    exitflag_full = zeros(swarm, 1);
+tic;
+    parfor idx = 1:size(x0,1)
+        fprintf('\n \n Executing run %.0f \n %%%%%%%%%%%%%%%%%%%%%', idx);
+        [z_opt_temp,fval_temp,exitflag_temp,~] = fminsearch(@(z) obj_fun(z, P, controller_flag), z0(idx,:), options);
+        z_opt_full(idx,:) = z_opt_temp;
+        fval_full(idx,:) = fval_temp;
+        exitflag_full(idx,:) = exitflag_temp;
+    end
+    fval_full(fval_full < - 1e15) = 0;
+    [~, idxMax] = min(fval_full);
+    z_opt = z_opt_full(idxMax,:);
+    fval = fval_full(idxMax);
+    exitflag = exitflag_full(idxMax);
+    x_opt_full = exp(z_opt_full);
+    fval_full = fval_full * -1;
+else
+            warning('No valid criteria selected.')
+end
+toc
 %% Display Results
 x_opt = exp(z_opt);  % if x is the same length as z
 
