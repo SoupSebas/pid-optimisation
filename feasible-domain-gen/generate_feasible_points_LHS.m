@@ -5,9 +5,12 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
 %   Then selects a subset that are far apart in 9D space.
 %
 %   Inputs:
+%     controller_flag = number of controller parameters required
+%     criteria_flag = highest bandwidth, fuirthest hyperdistance or swarm
 %     nPool   = number of feasible points desired
 %     nSelect = number of final points chosen from the feasible pool
 %     P       = open-loop plant used in cost_fun_basic
+%     P_term = pid simplified usecase variable
 %
 %   Output:
 %     Xout    = nSelect x 9 array of chosen feasible starting points
@@ -122,12 +125,11 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
         Xout = feasiblePoints(selectedIdx, :);
         % Xinfo contains corresponding [f_BW, stability, margins]
         Xinfo = [feasible_fBW(selectedIdx), feasible_stability(selectedIdx), feasible_margins(selectedIdx, :)];
-    elseif criteria_flag == 2
-        % Otherwise pick nSelect by a simple greedy distance method
+    elseif criteria_flag == 2 % || criteria_flag == 3
         Xout = zeros(nSelect, N);
         poolCopy = feasiblePoints;
     
-        % 1) pick the first point arbitrarily (e.g., first row)
+        % Pick the first point arbitrarily (e.g., first row)
         Xout(1,:) = poolCopy(1, :);
         poolCopy(1, :) = [];
     
@@ -142,9 +144,13 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_
             end
     
             % Pick the candidate with the maximum minimum-distance
-            [~, idxMax] = max(distToChosen);
-            Xout(k,:) = poolCopy(idxMax, :);
-            poolCopy(idxMax, :) = [];
+            [~, idxMax] = sort(distToChosen,'descend');
+            selectedIdx = idxMax(1);
+            %[~, idxMax] = max(distToChosen);
+            %Xout(k,:) = poolCopy(selectedIdx, :);
+            Xout(k,:) = poolCopy(selectedIdx, :);
+            Xinfo = [feasible_fBW(selectedIdx), feasible_stability(selectedIdx), feasible_margins(selectedIdx, :)];
+            poolCopy(selectedIdx, :) = [];
         end
     end
 end
