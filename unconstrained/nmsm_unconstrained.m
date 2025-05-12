@@ -4,7 +4,7 @@
 function stop = terminality_criteria_eval(z, optimValues, state, P, controller_flag)
     x = exp(z);
     persistent fvals feas_flags
-    threshold = 1;
+    threshold = 1e-1;
     N = 20;
     stop = false;
     
@@ -13,6 +13,21 @@ function stop = terminality_criteria_eval(z, optimValues, state, P, controller_f
             fvals = [];
             feas_flags = [];
         case 'iter'
+
+            % Once we have N steps:
+            if length(fvals) >= N
+                delta = abs(diff(fvals(end-N+1:end)));
+                avg_improvement = mean(delta);
+
+                % Check feasibility of last N
+                recent_flags = feas_flags(end-N+1:end);
+                all_feasible = all(recent_flags == 1);
+
+                % Terminate if both conditions met
+                if avg_improvement < threshold && all_feasible
+                    stop = true;
+                end
+            end
             % Store function value
             fvals(end+1) = optimValues.fval;
 
@@ -29,20 +44,6 @@ function stop = terminality_criteria_eval(z, optimValues, state, P, controller_f
             [~, stability_flag, ~, ~] = cost_fun_basic(P,C);
             feas_flags(end+1) = stability_flag;
 
-            % Once we have N steps:
-            if length(fvals) >= N
-                delta = abs(diff(fvals(end-N+1:end)));
-                avg_improvement = mean(delta);
-
-                % Check feasibility of last N
-                recent_flags = feas_flags(end-N+1:end);
-                all_feasible = all(recent_flags == 1);
-
-                % Terminate if both conditions met
-                if avg_improvement < threshold && all_feasible
-                    stop = true;
-                end
-            end
         case 'done'
             clear fvals feas_flags
     end
@@ -79,20 +80,19 @@ end
 %   5) pidt lpf notch
 
 
-controller_flag = 'pid simplified';
-P_term = 10; % For pid 'simplified' only
+controller_flag = 'pidt notch';
+P_term = 20; % For pid 'simplified' only
 criteria_flag = 1; % 1: Bandwidth sorted 2: Distance maximized w.r.t. each other
 plant = 'mass spring damper';
 
 % =======================
 % =======================
-% =======================
-%% 
+
 switch lower(plant)
     case 'plant hard'
         load("PlantTF_hard.mat");
     case 'plant easy'
-        load("PlantTF_easy.mat");
+        load("PlantTF_easy.mat")
     case 'mass only'
         s = tf('s');
         m = 0.5;
@@ -104,7 +104,7 @@ switch lower(plant)
         c = 5;
         P = 1/(k + c*s + m*s^2);
 end
-
+%% Optimiser itself - no need for user input here
 % Define Initial Guess and Bounds for PID Parameters and Notch filter
 %     P    I    D    T      LPF           Notch
 %                                    w1   w2       Q1     Q2  
@@ -134,10 +134,10 @@ x_opt = exp(z_opt);  % if x is the same length as z
 fprintf('Optimization starting... \n')
 x_opt_cell = num2cell(x_opt);
 fprintf('Optimization finished succesfully! \n \n ...i hope so at least jaja \n \n')
-fprintf(['Optimized Parameters: P = %.1f, I = %.1f, D = %.1f, D_tamed = %.1f\n ...' ...
+fprintf(['Optimized Parameters: P = %.1f, I = %.1f, D = %.1f, D_tamed = %.1f\n ' ...
 'LPF = %.1f Notch: w1 = %.1f, w2 = %.1f, q1 = %.3f, q2 = %.3f \n'], [x_opt_cell{:}]);
 fprintf('Maximum Bandwidth: %.1f Hz\n', -1*fval);
-fprintf('\n Exit flag: %.0f', exitflag);
+fprintf('\n Exit flag: %.0f \n', exitflag);
 
 if contains(controller_flag , 'pid simplified')
     x_opt_cell = [ { P_term }, x_opt_cell];
