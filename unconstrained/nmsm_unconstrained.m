@@ -83,11 +83,14 @@ end
 %   5) pidt lpf notch
 
 
-controller_flag = 'pidt';
+controller_flag = 'pidt lpf notch';
 P_term = 20; % For pid 'simplified' only
 criteria_flag = 2; % 1: Bandwidth sorted 2: Hyperdistance maximized w.r.t. each other
-plant = 'mass spring damper';
+plant = 'plant hard';
+swarm = 1000;
+bananas = 1e4; % Parameter at which a run is considered to be exploiting the cost function in an undesired way
 
+%% Optimiser itself - no need for user input here
 % =======================
 % =======================
 
@@ -107,7 +110,6 @@ switch lower(plant)
         c = 5;
         P = 1/(k + c*s + m*s^2);
 end
-%% Optimiser itself - no need for user input here
 % Define Initial Guess and Bounds for PID Parameters and Notch filter
 %     P    I    D    T      LPF           Notch
 %                                    w1   w2       Q1     Q2  
@@ -130,8 +132,7 @@ if criteria_flag == 1
     
     [z_opt,fval,exitflag,output] = fminsearch(@(z) obj_fun(z, P, controller_flag), z0, options);
 elseif criteria_flag == 2
-    swarm = 100;
-    x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, 100,swarm, P, 20);
+    x0 = generate_feasible_points_LHS(controller_flag, criteria_flag, swarm ,swarm, P, 20);
     fprintf('\n');
     z0 = log(x0);
     fprintf('Feasible points vector created \n');
@@ -148,7 +149,7 @@ tic;
         fval_full(idx,:) = fval_temp;
         exitflag_full(idx,:) = exitflag_temp;
     end
-    fval_full(fval_full < - 1e15) = 0;
+    fval_full(fval_full < - bananas) = 0;
     [~, idxMax] = min(fval_full);
     z_opt = z_opt_full(idxMax,:);
     fval = fval_full(idxMax);
