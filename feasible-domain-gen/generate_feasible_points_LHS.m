@@ -1,13 +1,16 @@
-function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nSelect, P)
+function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, criteria_flag, nPool, nSelect, P, P_term)
 % GENERATE_FEASIBLE_POINTS_LHS
 %   Generates a pool of feasible design vectors (1x9, positive)
 %   using Latin Hypercube Sampling (LHS).
 %   Then selects a subset that are far apart in 9D space.
 %
 %   Inputs:
+%     controller_flag = number of controller parameters required
+%     criteria_flag = highest bandwidth, fuirthest hyperdistance or swarm
 %     nPool   = number of feasible points desired
 %     nSelect = number of final points chosen from the feasible pool
 %     P       = open-loop plant used in cost_fun_basic
+%     P_term = pid simplified usecase variable
 %
 %   Output:
 %     Xout    = nSelect x 9 array of chosen feasible starting points
@@ -23,10 +26,12 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
     %    (1)  (2)  (3)  (4)     (5)      (6)  (7)      (8)   (9)
     %lowerB = [1, 1, 1 ,1 ,1 , 1 ,1 ,1e-3 ,1e-3];
     %upperB = [1e7, 1e4, 1e4, 1e4, 1e4, 2e3, 2e3, 5e1, 5e1];
-    lowerB = 1;
+    lowerB = 1e-2;
     upperB = 1e5;
 
     switch lower(controller_flag)
+        case 'pid simplified'
+            N = 2;
         case 'pid'
             N = 3;
         case 'pidt'
@@ -35,6 +40,8 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
             N = 5;
         case 'pidt notch'
             N = 7;
+        case 'pidt lpf notch'
+            N = 8;
         otherwise
             error('Unknown flag ''%s''.', controller_flag);
     end
@@ -46,7 +53,7 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
     % enough feasible points. For example, sample 2*nPool total:
     nCandidates = 10 * nPool;
 
-    % LHS returns an nCandidates x 9 matrix with values in (0, 1)
+    % LHS returns an nCandidates x N matrix with values in (0, 1)
     lhsMatrix = lhsdesign(nCandidates, N);
 
     % Scale each column to [lowerB, upperB]
@@ -60,6 +67,11 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
     feasible_fBW = [];       % To record the bandwidth (f_BW)
     feasible_stability = []; % To record the stability flag
     feasible_margins = [];
+
+    if contains(controller_flag , 'pid simplified')
+        P_col = P_term.* ones(nCandidates,1);
+        Xcand = [P_col Xcand];
+    end
 
     for i = 1:nCandidates
         xCandidate = Xcand(i, :);
@@ -92,6 +104,11 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
             size(feasiblePoints,1), nPool);
     end
 
+    if contains(controller_flag, 'pid simplified')
+        feasiblePoints = feasiblePoints(:,2:end);
+    end
+
+
     % --------------------------------------------------------------------
     % 3) Select nSelect points with the highest recorded bandwidth (f_BW)
     % --------------------------------------------------------------------
@@ -99,7 +116,7 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
         Xout = feasiblePoints;
         Xinfo = [feasible_fBW, feasible_stability, feasible_margins];
         return;
-    else
+    elseif criteria_flag == 1
         % Sort feasible candidates by f_BW in descending order so higher bandwidth comes first
         [~, idxSort] = sort(feasible_fBW, 'descend');
         selectedIdx = idxSort(1:nSelect);
@@ -108,4 +125,32 @@ function [Xout, Xinfo] = generate_feasible_points_LHS(controller_flag, nPool, nS
         Xout = feasiblePoints(selectedIdx, :);
         % Xinfo contains corresponding [f_BW, stability, margins]
         Xinfo = [feasible_fBW(selectedIdx), feasible_stability(selectedIdx), feasible_margins(selectedIdx, :)];
+    elseif criteria_flag == 2 % || criteria_flag == 3
+        Xout = zeros(nSelect, N);
+        poolCopy = feasiblePoints;
+    
+        % Pick the first point arbitrarily (e.g., first row)
+        Xout(1,:) = poolCopy(1, :);
+        poolCopy(1, :) = [];
+    
+        for k = 2:nSelect
+            distToChosen = zeros(size(poolCopy,1),1);
+    
+            % For each candidate in poolCopy, find distance to already chosen points
+            for i = 1:size(poolCopy,1)
+                diffs = Xout(1:k-1,:) - poolCopy(i,:);
+                dists = sqrt(sum(diffs.^2, 2)); 
+                distToChosen(i) = min(dists);
+            end
+    
+            % Pick the candidate with the maximum minimum-distance
+            [~, idxMax] = sort(distToChosen,'descend');
+            selectedIdx = idxMax(1);
+            %[~, idxMax] = max(distToChosen);
+            %Xout(k,:) = poolCopy(selectedIdx, :);
+            Xout(k,:) = poolCopy(selectedIdx, :);
+            Xinfo = [feasible_fBW(selectedIdx), feasible_stability(selectedIdx), feasible_margins(selectedIdx, :)];
+            poolCopy(selectedIdx, :) = [];
+        end
     end
+end
